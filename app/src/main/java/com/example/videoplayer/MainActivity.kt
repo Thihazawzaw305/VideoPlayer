@@ -1,42 +1,100 @@
 package com.example.videoplayer
 
-import android.media.Image.Plane
-import android.net.Uri
+
+import android.annotation.SuppressLint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.View
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.SimpleExoPlayer
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.Util
+import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.custom_controller.*
-import java.util.SimpleTimeZone
 
 class MainActivity : AppCompatActivity() {
+    private var player: ExoPlayer? = null
+    private var playWhenReady = true
+    private var currentItem = 0
+    private var playbackPosition = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val simpleExoPlayer = SimpleExoPlayer.Builder(this)
-            .setSeekBackIncrementMs(5000)
-            .setSeekForwardIncrementMs(5000)
-            .build()
-       playerView.player = simpleExoPlayer
-        playerView.keepScreenOn = true
-        simpleExoPlayer.addListener(object : Player.Listener{
-            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-                if (playbackState == Player.STATE_BUFFERING){
-                  progressBar.visibility = View.VISIBLE
-                }
-                else  if(playbackState == Player.STATE_READY){
-                    progressBar.visibility = View.GONE
 
-                }
+
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (Util.SDK_INT > 23) {
+            initializePlayer()
+        }
+    }
+
+
+    override fun onResume() {
+        super.onResume()
+        hideSystemUi()
+        if (Util.SDK_INT <= 23 || player == null) {
+            initializePlayer()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (Util.SDK_INT <= 23) {
+            releasePlayer()
+        }
+    }
+
+
+    override fun onStop() {
+        super.onStop()
+        if (Util.SDK_INT > 23) {
+            releasePlayer()
+        }
+    }
+
+
+    private fun initializePlayer() {
+        player = ExoPlayer.Builder(this)
+            .build()
+            .also { exoPlayer ->
+                playerView.player = exoPlayer
+
+               val mediaItem = MediaItem.fromUri(getString(R.string.test_video))
+
+//                val mediaItem = MediaItem.Builder()
+//                    .setUri(getString(R.string.test_video))
+//                    .setMimeType(MimeTypes.APPLICATION_MPD)
+//                    .build()
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.playWhenReady = playWhenReady
+                exoPlayer.seekTo(currentItem,playbackPosition)
+                exoPlayer.prepare()
             }
-        })
-        val videoSource = Uri.parse("http://thinkingform.com/video-sample-mp4/")
-        val mediaItem =  MediaItem.fromUri(videoSource)
-        simpleExoPlayer.setMediaItem(mediaItem)
-        simpleExoPlayer.prepare()
-        simpleExoPlayer.play()
+    }
+
+    private fun releasePlayer(){
+        player?.let { exoPlayer ->
+            playWhenReady = exoPlayer.playWhenReady
+            currentItem = exoPlayer.currentMediaItemIndex
+            playbackPosition = exoPlayer.currentPosition
+            exoPlayer.release()
+        }
+        player = null
+    }
+
+    @SuppressLint("InlinedApi")
+    private fun hideSystemUi() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, playerView).let { controller ->
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
     }
 }
